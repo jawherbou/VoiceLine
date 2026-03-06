@@ -66,7 +66,7 @@ POST /v1/audio/process  (multipart, field: "audio")
 #### 1. Clone & configure
 
 ```bash
-git clone https://github.com/yourname/voiceline-backend
+git clone https://github.com/jawherbou/voiceline-backend
 cd voiceline-backend
 
 cp .env.example .env
