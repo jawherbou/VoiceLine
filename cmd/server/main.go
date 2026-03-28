@@ -18,6 +18,7 @@ import (
 	"github.com/voiceline/backend/internal/audio"
 	"github.com/voiceline/backend/internal/integrations"
 	"github.com/voiceline/backend/internal/llm"
+	"github.com/voiceline/backend/internal/ratelimit"
 )
 
 func main() {
@@ -46,6 +47,11 @@ func main() {
 	}
 
 	r := gin.Default()
+
+	// Rate limiter — token bucket, per IP and per user
+	limiter := ratelimit.New(ratelimit.DefaultIPConfig, ratelimit.DefaultUserConfig)
+	// Apply rate limiting globally
+	r.Use(limiter.Middleware())
 
 	// health check
 	r.GET("/health", func(c *gin.Context) {
