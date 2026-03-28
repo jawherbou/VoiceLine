@@ -9,8 +9,13 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -65,8 +70,35 @@ func main() {
 		v1.POST("/audio/process", processor.Process)
 	}
 
-	log.Printf("VoiceLine backend starting on :%s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	// wrap gin in an http.Server so we can shut it down gracefully
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
 	}
+
+	// start server in a goroutine so it doesn't block the shutdown listener
+	go func() {
+		log.Printf("VoiceLine backend starting on :%s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server: %v", err)
+		}
+	}()
+
+	// Graceful shutdown
+	// Wait for SIGINT (Ctrl+C) or SIGTERM (Docker/K8s stop signal)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down — draining in-flight requests...")
+
+	// give active HTTP requests 10 seconds to finish
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Server shutdown error: %v", err)
+	}
+
+	log.Println("Shutdown complete")
 }
